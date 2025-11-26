@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title> Dashboard — Port Scan Detection</title>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <style>
+        body { font-family: Arial; margin: 10px; background:#0f1724; color: #e6eef8; }
+        h1 { color:#7dd3fc; }
+        .row { display:flex; flex-wrap:wrap; gap:20px; margin-top: 12px; }
+        .card { background:#071126; padding:12px; border-radius:8px; box-shadow: 0 2px 8px rgba(0,0,0,0.6); }
+        .col { flex:1; min-width: 260px; }
+        table { width:100%; border-collapse: collapse; color: #e6eef8; }
+        th, td { padding:6px 8px; border-bottom: 1px solid #123; text-align:left; }
+        .small { font-size:0.9em; color:#9aa8b8; }
+        #controls { display:flex; gap:10px; align-items:center; margin-top:8px; }
+        .btn { padding:8px 12px; background:#0ea5a1; color:#042; border-radius:6px; cursor:pointer; }
+        .alert-row { cursor:pointer; transition: background 0.15s; }
+        .alert-row:hover { background:rgba(125, 211, 252, 0.08); }
+        .alert-row.ack { opacity:0.6; }
+        .modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.6);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        .modal.show { display:flex; }
+        .modal-content {
+            background:#0b152e;
+            padding:20px;
+            border-radius:10px;
+            width: min(600px, 90%);
+            max-height: 90vh;
+            overflow:auto;
+            box-shadow:0 10px 30px rgba(0,0,0,0.6);
+        }
+        .modal-actions { display:flex; gap:10px; flex-wrap:wrap; margin-top:12px; }
+        .modal-actions button { flex:1; min-width:120px; }
+    </style>
+</head>
+<body>
+    <h1> Dashboard — Port Scan Detection</h1>
+
+    <div id="controls">
+        <button id="exportBtn" class="btn">Export logs (CSV)</button>
+        <div class="small">Auto-update: 1s</div>
+    </div>
+
+    <div class="row">
+        <div class="card col" style="flex:2;">
+            <h3>Globals Metrics</h3>
+            <div style="display:flex; gap:20px; flex-wrap:wrap;">
+                <div>
+                    <div class="small">Packets (Total)</div>
+                    <div id="packets" style="font-size:24px">0</div>
+                    <div class="small" style="color:#7dd3fc; margin-top:4px;">
+                        <span id="packetRate">0.0</span> pkt/s
+                    </div>
+                </div>
+                <div>
+                    <div class="small">Scans (Total)</div>
+                    <div id="scans" style="font-size:24px">0</div>
+                    <div class="small" style="color:#f87171; margin-top:4px;">
+                        <span id="scanRate">0.0</span> scan/min
+                    </div>
+                </div>
+                <div>
+                    <div class="small">Risk Ratio</div>
+                    <div id="ratio" style="font-size:24px">0</div>
+                    <div class="small" style="color:#fbbf24; margin-top:4px;">
+                        <span id="scanRateHour">0.0</span> scan/hour
+                    </div>
+                </div>
+            </div>
+            <canvas id="scanLine" style="height:180px;margin-top:10px"></canvas>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:20px; flex:1;">
+            <div class="card col">
+                <h3>Top Scanned Ports </h3>
+                <canvas id="portsBar" style="height:220px"></canvas>
+            </div>
+            <div class="card col">
+                <h3>Top Talkers (IPs)</h3>
+                <canvas id="ipsBar" style="height:220px"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="card col">
+            <h3>📊 Alert Statistics</h3>
+            <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap:15px; margin-top:10px;">
+                <div style="text-align:center;">
+                    <div class="small">Total Alerts</div>
+                    <div id="alertTotal" style="font-size:28px; font-weight:bold; color:#7dd3fc;">0</div>
+                </div>
+                <div style="text-align:center;">
+                    <div class="small">Unacknowledged</div>
+                    <div id="alertUnack" style="font-size:28px; font-weight:bold; color:#f87171;">0</div>
+                </div>
+                <div style="text-align:center;">
+                    <div class="small">Acknowledged</div>
+                    <div id="alertAck" style="font-size:28px; font-weight:bold; color:#34d399;">0</div>
+                    <div class="small" id="alertAckPercent" style="font-size:0.85em; margin-top:4px;">0%</div>
+                </div>
+                <div style="text-align:center;">
+                    <div class="small">Alert Rate</div>
+                    <div id="alertRate" style="font-size:28px; font-weight:bold; color:#fbbf24;">0</div>
+                    <div class="small" style="font-size:0.85em; margin-top:4px;">per hour</div>
+                </div>
+                <div style="text-align:center;">
+                    <div class="small">Last Hour</div>
+                    <div id="alertRecent" style="font-size:28px; font-weight:bold; color:#a78bfa;">0</div>
+                </div>
+                <div style="text-align:center;">
+                    <div class="small">High Severity</div>
+                    <div id="alertHighSev" style="font-size:28px; font-weight:bold; color:#ef4444;">0</div>
+                    <div class="small" style="font-size:0.85em; margin-top:4px;">prob &gt; 0.7</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="card col">
+            <h3>Latest Alertes</h3>
+            <table id="alertsTable">
+                <thead><tr><th>Time</th><th>IP</th><th>Port</th><th>Prob</th></tr></thead>
+                <tbody></tbody>
+            </table>
+            <h4 style="margin-top:10px">Latest suspect packet</h4>
+            <pre id="lastSuspect">Aucun</pre>
+        </div>
+        <div class="card col" style="max-width:360px">
+            <h3>System</h3>
+            <div>CPU: <span id="cpu">0%</span></div>
+            <div>RAM: <span id="ram">0%</span></div>
+            <div>Loop: <span id="loopTime">0 ms</span></div>
+            <div>Queue depth: <span id="queueDepth">0</span></div>
+            <div>Blocklist entries: <span id="blockCount">0</span></div>
+            <div style="margin-top:8px">ML Info (feature importances / model)</div>
+            <pre id="mlInfo" style="height:140px; overflow:auto"></pre>
+        </div>
+    </div>
+
+    <div id="alertModal" class="modal">
+        <div class="modal-content">
+            <button id="modalClose" class="btn" style="background:#ef4444;color:#fff;float:right;">Fermer</button>
+            <h3>Alerte Details</h3>
+            <div class="small" id="modalMeta"></div>
+            <pre id="modalAlertJson" style="margin-top:10px; background:#050b18; padding:10px;"></pre>
+            <h4>IP History</h4>
+            <pre id="modalHistory" style="background:#050b18; padding:10px; max-height:180px; overflow:auto;"></pre>
+            <div class="modal-actions">
+                <button id="ackBtn" class="btn">Marquer comme traité</button>
+                <button id="blockBtn" class="btn" style="background:#f97316;color:#230;">Bloquer l'IP</button>
+                <button id="exportIpBtn" class="btn" style="background:#93c5fd;color:#012;">Exporter logs IP</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/main.js"></script>
+</body>
+</html>
