@@ -28,12 +28,15 @@ projetcyber/
 ├── detect_live.py          # Live detection pipeline
 ├── live_extract.py         # Packet capture and feature extraction
 ├── dashboard_server.py     # Flask-SocketIO backend server
+├── datasets.rar
 ├── templates/
-│   └── dashboard.html      # Dashboard frontend
+│   └── dashboard.html     # Dashboard frontend
 ├── static/
 │   └── main.js            # Dashboard JavaScript
-├── feature_list.csv        # List of features used by the model
+├── feature_list.csv       # List of features used by the model
+├── portscan_rf.pkl        #model        
 └── .gitignore             # Git ignore file
+
 ```
 
 ## Requirements
