@@ -89,7 +89,4 @@ The Random Forest model achieves:
 - You'll need to provide your own `normal_dataset.csv` and `malicious_dataset.csv` files
 - The live detection requires appropriate network interface permissions (may need admin/root access)
 
-## License
-
-[Your License Here]
 
