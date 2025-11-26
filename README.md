@@ -86,10 +86,6 @@ The Random Forest model achieves:
 - **Export**: Download detection logs as CSV
 - **System Stats**: CPU, RAM, pipeline performance metrics
 
-## Notes
 
-- Large files (`.pkl` model files, `.csv` datasets, `.mp4` videos) are excluded from the repository
-- You'll need to provide your own `normal_dataset.csv` and `malicious_dataset.csv` files
-- The live detection requires appropriate network interface permissions (may need admin/root access)
 
 
